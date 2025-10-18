@@ -6,6 +6,7 @@ from django.shortcuts import (
     redirect,
     render,
 )
+from django.http import Http404
 
 from .forms import (
     WriteNoteForm,
@@ -58,6 +59,9 @@ def write_note(request):
 @login_required
 def note(request, pk):
     note = get_object_or_404(Note, pk=pk)
+    # Enforce access control: only sender or receiver may view the note
+    if note.sender != request.user and note.receiver != request.user:
+        raise Http404()
     return render(request, 'note.html', {'note': note})
 
 
