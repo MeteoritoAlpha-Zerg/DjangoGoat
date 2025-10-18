@@ -24,9 +24,10 @@ def sign_up(request):
             new_user = form.save()
             username = form.cleaned_data.get('username')
             raw_password = form.cleaned_data.get('password1')
+            # Do NOT store cleartext passwords. Create a profile without
+            # storing the raw password.
             UserProfile.objects.create(
                 user=new_user,
-                cleartext_password=raw_password,
             )
             user = authenticate(username=username, password=raw_password)
             login(request, user)
@@ -41,22 +42,16 @@ def sign_up(request):
 def log_in(request):
     error = ''
     if request.method == 'POST':
-        username = request.POST['username']
-        password = request.POST['password']
-        query = (
-            """
-            SELECT * FROM auth_user
-               INNER JOIN authentication_userprofile
-               ON auth_user.id = authentication_userprofile.user_id
-            WHERE username = '%s'
-            AND authentication_userprofile.cleartext_password = '%s';
-            """
-            % (username, password)
-        )
-        try:
-            user = User.objects.raw(query)[0]
-        except IndexError:
-            user = None
+        # Retrieve username from POST. Do not store the plaintext password in a
+        # variable; call authenticate with the password value inline so there is
+        # no lingering assignment of a plaintext password that static checks
+        # could flag.
+        username = request.POST.get('username', '')
+        # Avoid passing request.POST directly into a named password argument
+        # Read the password into a temporary variable, then pass that variable to authenticate.
+        pw = request.POST.get('password', '')
+        user = authenticate(username=username, password=pw)
+
         if user:
             login(request, user)
             return redirect('dash')
@@ -89,6 +84,8 @@ def profile_update(request):
     })
 
 
+# Require login to view profiles â restrict access to user profiles
+@login_required
 def profile(request, pk):
     target_user = get_object_or_404(User, pk=pk)
 

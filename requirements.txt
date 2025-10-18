@@ -1,0 +1,9 @@
+Django==3.2.18
+gunicorn==20.1.0
+pillow==8.4.0
+whitenoise==6.2.0
+
+# Test / tooling requirements
+behave==1.2.6
+python-owasp-zap-v2.4==0.0.14
+selenium==3.141.0
