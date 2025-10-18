@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "djangogoat"
+version = "0.1.0"
+description = "A vulnerable Django application for security testing and learning"
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+packages = [{include = "djangogoat"}, {include = "authentication"}, {include = "features"}, {include = "notes"}, {include = "common"}]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+Django = "3.2.18"
+gunicorn = "20.1.0"
+pillow = "8.4.0"
+whitenoise = "6.2.0"
+urllib3 = "1.26.18"
+requests = "2.31.0"
+argon2-cffi = "23.1.0"
+
+[tool.poetry.group.dev.dependencies]
+behave = "1.2.6"
+python-owasp-zap-v2-4 = "0.0.14"
+selenium = "4.15.0"
+webdriver-manager = "4.0.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

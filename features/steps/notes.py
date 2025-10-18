@@ -98,5 +98,5 @@ def step_impl(context):
 
 @when("I force browse to note {note_id}")  # noqa: F811
 def step_impl(context, note_id):
-    note_url = 'https://localhost:8000/note/%s/' % note_id
+    note_url = 'http://localhost:8000/note/%s/' % note_id
     context.browser.get(note_url)

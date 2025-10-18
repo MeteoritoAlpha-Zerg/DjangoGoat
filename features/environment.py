@@ -39,29 +39,39 @@ def start_firefox(context):
     """
     Starts Firefox in headless mode, and proxying through ZAP.
     """
+    from selenium.webdriver.firefox.service import Service
+    from selenium.webdriver.common.proxy import Proxy, ProxyType
+    from selenium.webdriver.firefox.firefox_profile import FirefoxProfile
+    from webdriver_manager.firefox import GeckoDriverManager
+    
     options = Options()
     options.headless = True
+    
+    # Set Firefox preferences to avoid profile issues
+    options.set_preference("browser.download.folderList", 2)
+    options.set_preference("browser.download.manager.showWhenStarting", False)
+    options.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/octet-stream")
+    options.set_preference("browser.startup.homepage", "about:blank")
+    options.set_preference("startup.homepage_welcome_url", "about:blank")
+    options.set_preference("startup.homepage_welcome_url.additional", "about:blank")
+    
+    # Set up proxy for ZAP
     zap_proxy = 'localhost:8080'
-    desired_capabilities = webdriver.DesiredCapabilities.FIREFOX
-    # The noProxy list contains domains which Firefox appears to make requests
-    # to automatically. If those requests pass through ZAP when scans are
-    # running, they interfere with the scans, so set them as not being proxied.
-    desired_capabilities['proxy'] = {
-        'proxyType': 'MANUAL',
-        'ftpProxy': zap_proxy,
-        'httpProxy': zap_proxy,
-        'sslProxy': zap_proxy,
-        'noProxy': [
-            'digicert.com',
-            'firefox.com',
-            'mozilla.com',
-            'mozilla.net',
-        ],
-    }
+    proxy = Proxy()
+    proxy.proxy_type = ProxyType.MANUAL
+    proxy.http_proxy = zap_proxy
+    proxy.ssl_proxy = zap_proxy
+    proxy.ftp_proxy = zap_proxy
+    proxy.no_proxy = ['digicert.com', 'firefox.com', 'mozilla.com', 'mozilla.net']
+    
+    options.proxy = proxy
+    
+    # Use webdriver-manager to automatically handle geckodriver
+    service = Service(GeckoDriverManager().install())
+    
     context.browser = webdriver.Firefox(
-        executable_path='geckodriver',
+        service=service,
         options=options,
-        capabilities=desired_capabilities,
     )
     yield context.browser
 
@@ -98,7 +108,7 @@ def after_all(context):
     """
     # General preparation.
     zap = ZAPv2(apikey=None)
-    base_url = 'https://localhost:8000'
+    base_url = 'http://localhost:8000'
     logged_out_indicator_regex = r'\QSign Up\E'
     logout_url_regex = '%s/logout.*' % base_url
     main_context_regex = '%s.*' % base_url
@@ -230,8 +240,17 @@ def after_all(context):
     # Spider the app as an unauthenticated user.
     print('Spidering %s as an unauthenticated user.' % base_url)
     scan_id = spider.scan(base_url)
-    while (int(spider.status(scan_id)) < 100):
-        print('Spider progress: %s%%' % spider.status(scan_id))
+    while True:
+        status = spider.status(scan_id)
+        try:
+            status_int = int(status)
+            if status_int >= 100:
+                break
+            print('Spider progress: %s%%' % status)
+        except ValueError:
+            print('Spider status: %s' % status)
+            if status == 'does_not_exist':
+                break
         sleep(5)
     print('***RESULTS***')
     for result in sorted(spider.results()):
@@ -239,7 +258,14 @@ def after_all(context):
     print('')
 
     # # Give the passive scanner a chance to finish
-    while (int(zap.pscan.records_to_scan) > 0):
+    while True:
+        records = zap.pscan.records_to_scan
+        try:
+            if int(records) <= 0:
+                break
+        except ValueError:
+            if records == 'does_not_exist':
+                break
         sleep(1)
 
     # Set up the active scanner.
@@ -265,8 +291,17 @@ def after_all(context):
         )
         print('Spidering (scan id %s).' % scan_id)
         sleep(5)
-        while (int(spider.status(scan_id)) < 100):
-            print('Progress: %s%%' % spider.status(scan_id))
+        while True:
+            status = spider.status(scan_id)
+            try:
+                status_int = int(status)
+                if status_int >= 100:
+                    break
+                print('Progress: %s%%' % status)
+            except ValueError:
+                print('Spider status: %s' % status)
+                if status == 'does_not_exist':
+                    break
             sleep(2)
         print('***RESULTS***')
         for result in sorted(zap.spider.results()):
@@ -274,7 +309,14 @@ def after_all(context):
         print('')
 
         # # Give the passive scanner a chance to finish
-        while (int(zap.pscan.records_to_scan) > 0):
+        while True:
+            records = zap.pscan.records_to_scan
+            try:
+                if int(records) <= 0:
+                    break
+            except ValueError:
+                if records == 'does_not_exist':
+                    break
             sleep(1)
 
         # Run the active scan.
@@ -288,8 +330,17 @@ def after_all(context):
             postdata=True
         )
         print('Active scanning (scan id %s).' % scan_id)
-        while (int(ascan.status(scan_id)) < 100):
-            print('Progress: %s%%' % ascan.status(scan_id))
+        while True:
+            status = ascan.status(scan_id)
+            try:
+                status_int = int(status)
+                if status_int >= 100:
+                    break
+                print('Progress: %s%%' % status)
+            except ValueError:
+                print('Active scan status: %s' % status)
+                if status == 'does_not_exist':
+                    break
             sleep(5)
 
     print('All scans completed')
