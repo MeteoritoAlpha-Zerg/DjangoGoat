@@ -85,7 +85,7 @@ def conversation(request, friend_pk):
             note.save()
             return redirect('conversation', friend_pk=friend_pk)
     else:
-        form = WriteNoteForm()
+        form = ReplyForm()
 
     return render(request, 'conversation.html', {
         'conversation': conversation,

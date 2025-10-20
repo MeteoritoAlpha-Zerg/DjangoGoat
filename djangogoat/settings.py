@@ -136,5 +136,4 @@ DATE_FORMAT = 'd M Y'
 DATETIME_FORMAT = 'd M Y, g:i a'
 
 
-# Security degradations
 SESSION_COOKIE_HTTPONLY = False
