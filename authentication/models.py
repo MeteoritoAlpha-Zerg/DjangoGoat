@@ -12,4 +12,6 @@ class UserProfile(models.Model):
     user = models.OneToOneField('auth.User', on_delete=models.CASCADE)
     avatar = models.ImageField(upload_to=upload_path, blank=True)
     bio = models.TextField(max_length=255, blank=True)
-    cleartext_password = models.TextField(max_length=255)
+
+    def __str__(self):
+        return f"UserProfile(user_id={self.user_id})"
