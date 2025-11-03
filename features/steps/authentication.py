@@ -5,34 +5,39 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 
+def _go_to(context, path):
+    base_url = getattr(context, 'base_url', 'http://localhost:8000')
+    context.browser.get(f'{base_url}{path}')
+
+
 @given("I'm on the dashboard")  # noqa: F811
 def step_impl(context):
-    context.browser.get('http://localhost:8000/dash/')
+    _go_to(context, '/dash/')
 
 
 @given("I'm on the landing page")  # noqa: F811
 def step_impl(context):
-    context.browser.get('http://localhost:8000/')
+    _go_to(context, '/')
 
 
 @given("I'm on the login page")  # noqa: F811
 def step_impl(context):
-    context.browser.get('http://localhost:8000/login/')
+    _go_to(context, '/login/')
 
 
 @given("I'm on the profile page")  # noqa: F811
 def step_impl(context):
-    context.browser.get('http://localhost:8000/profile/')
+    _go_to(context, '/profile/')
 
 
 @given("I'm on the profile update page")  # noqa: F811
 def step_impl(context):
-    context.browser.get('http://localhost:8000/profile-update/')
+    _go_to(context, '/profile-update/')
 
 
 @given("I'm on the sign up page")  # noqa: F811
 def step_impl(context):
-    context.browser.get('http://localhost:8000/sign-up/')
+    _go_to(context, '/sign-up/')
 
 
 @then(u"I'm logged in")  # noqa: F811
@@ -56,12 +61,12 @@ def step_impl(context):
 
 @when("I go to the login page")  # noqa: F811
 def step_impl(context):
-    context.browser.get('http://localhost:8000/login/')
+    _go_to(context, '/login/')
 
 
 @when("I go to the sign up page")  # noqa: F811
 def step_impl(context):
-    context.browser.get('http://localhost:8000/sign-up/')
+    _go_to(context, '/sign-up/')
 
 
 @when(u'I enter valid credentials "{username}" and "{password}" and push the login button')  # noqa: E501,F811
