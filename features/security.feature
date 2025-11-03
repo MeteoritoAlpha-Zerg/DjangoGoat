@@ -2,14 +2,8 @@ Feature: Security Vulnerabilities
   # These tests check for security vulnerabilities that should be fixed
   # On the "broken" branch, many of these tests WILL FAIL (exposing vulnerabilities)
   # On the "fixed" branch, these tests should PASS (vulnerabilities fixed)
-
-  Background:
-    # Create test users for security testing
-    Given I'm on the sign up page
-    When I create "SecurityTester1" user with "Appletr33!" password
-    Then I'm logged in
-    When I click the log out button
-    Then I see the login page
+  # 
+  # Note: These tests use existing users created in authentication.feature
 
   @security @sql_injection
   Scenario: SQL Injection should not bypass authentication
@@ -40,7 +34,7 @@ Feature: Security Vulnerabilities
   @security @xss
   Scenario: XSS protection in user bio
     Given I'm on the login page
-    When I enter valid credentials "SecurityTester1" and "Appletr33!" and push the login button
+    When I enter valid credentials "TestyMcFirstson" and "Appletr33!" and push the login button
     Then I'm logged in
     When I click the edit profile button
     Then I see the profile update page
@@ -51,7 +45,7 @@ Feature: Security Vulnerabilities
   @security @xss
   Scenario: XSS protection in note content
     Given I'm on the login page
-    When I enter valid credentials "SecurityTester1" and "Appletr33!" and push the login button
+    When I enter valid credentials "TestrikDeuce" and "Appletr33!" and push the login button
     Then I'm logged in
     And I see the dashboard
     When I click 'start a conversation'
@@ -65,7 +59,7 @@ Feature: Security Vulnerabilities
     # The broken version stores cleartext passwords in UserProfile model (models.py line 15)
     # and uses them for authentication (views.py line 52)
     Given I'm on the login page
-    When I enter valid credentials "SecurityTester1" and "Appletr33!" and push the login button
+    When I enter valid credentials "ThriceVonTesterbergIII" and "Appletr33!" and push the login button
     Then I'm logged in
     When I go to the profile page
     Then the page should not contain the password
@@ -90,7 +84,7 @@ Feature: Security Vulnerabilities
     # The broken version has SESSION_COOKIE_HTTPONLY = False (settings.py line 140)
     # This makes cookies accessible to JavaScript, enabling XSS cookie theft
     Given I'm on the login page
-    When I enter valid credentials "SecurityTester1" and "Appletr33!" and push the login button
+    When I enter valid credentials "NaughtyGoat" and "Appletr33!" and push the login button
     Then I'm logged in
     # In a proper test, we'd check cookie flags via browser API
 
@@ -103,7 +97,8 @@ Feature: Security Vulnerabilities
 
   @security @auth
   Scenario: Unauthenticated access to protected resources
-    Given I'm not logged in
+    Given I'm on the landing page
+    And I'm not logged in
     When I force browse to note 1
     Then I see the login page
     # Unauthenticated users should be redirected to login

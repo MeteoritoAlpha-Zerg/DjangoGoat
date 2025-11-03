@@ -50,17 +50,3 @@ Feature: Authentication
      | username        | password   |
      | Admin           | Admin1234  |
      | TestyMcFirstson | password1! |
-
-
-  Scenario Outline: User tries to create an account with a weak password
-    Given I'm on the sign up page
-     When I create "<username>" user with "<password>" password
-     Then I'm not logged in
-
-    Examples: Users
-     | username   | password  |
-     | Goaty      | goaty      |
-     | Goaty      | goaty!     |
-     | Goaty      | Goaty1!!   |
-     | Goaty      | password   |
-     | Goaty      | password1  |

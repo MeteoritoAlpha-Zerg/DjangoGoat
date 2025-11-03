@@ -2,6 +2,12 @@
 *.pyc
 *.sqlite3
 
+# test outputs
+report.html
+pretty.output
+*.output
+
 # directories
 media
 staticfiles
+__pycache__
