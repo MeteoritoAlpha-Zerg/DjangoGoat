@@ -120,13 +120,25 @@ def recreate_database():
     Destroys and the recreates the SQLite database so each test run starts with
     a clean slate.
     """
+    print('\n' + '='*60)
+    print('DATABASE: Clearing and recreating database...')
+    print('='*60)
+    
     os.environ['DJANGO_SETTINGS_MODULE'] = 'djangogoat.settings'
     os.environ.setdefault('DJANGO_SECRET_KEY', 'insecure-behave-secret-key')
     django.setup()
     database_path = os.path.join(BASE_DIR, 'db.sqlite3')
+    
     if os.path.exists(database_path):
         os.remove(database_path)
+        print('✓ Deleted existing database')
+    else:
+        print('✓ No existing database found')
+    
+    print('✓ Running migrations...')
     call_command('migrate', '--noinput')
+    print('✓ Database ready - starting with clean slate')
+    print('='*60 + '\n')
 
 
 def before_all(context):

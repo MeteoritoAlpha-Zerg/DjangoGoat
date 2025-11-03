@@ -71,6 +71,9 @@ def step_impl(context):
 
 @when(u'I enter valid credentials "{username}" and "{password}" and push the login button')  # noqa: E501,F811
 def step_impl(context, username, password):
+    WebDriverWait(context.browser, 10).until(
+        EC.presence_of_element_located((By.ID, 'login_button'))
+    )
     login_button = context.browser.find_element(By.ID, 'login_button')
     username_field = context.browser.find_element(By.ID, 'id_username')
     password_field = context.browser.find_element(By.ID, 'id_password')
@@ -82,6 +85,9 @@ def step_impl(context, username, password):
 
 @when(u'I enter invalid credentials "{username}" and "{password}" and push the login button')  # noqa: E501,F811
 def step_impl(context, username, password):
+    WebDriverWait(context.browser, 10).until(
+        EC.presence_of_element_located((By.ID, 'login_button'))
+    )
     login_button = context.browser.find_element(By.ID, 'login_button')
     username_field = context.browser.find_element(By.ID, 'id_username')
     password_field = context.browser.find_element(By.ID, 'id_password')
@@ -93,6 +99,9 @@ def step_impl(context, username, password):
 
 @when(u'I create "{username}" user with "{password}" password')  # noqa: F811
 def step_impl(context, username, password):
+    WebDriverWait(context.browser, 10).until(
+        EC.presence_of_element_located((By.ID, 'submit_button'))
+    )
     username_field = context.browser.find_element(By.ID, 'id_username')
     password_field = context.browser.find_element(By.ID, 'id_password1')
     password2_field = context.browser.find_element(
@@ -110,6 +119,9 @@ def step_impl(context, username, password):
 
 @when(u'I add a new "{bio}" and click the update button')  # noqa: F811
 def step_impl(context, bio):
+    WebDriverWait(context.browser, 10).until(
+        EC.presence_of_element_located((By.ID, 'update'))
+    )
     bio_field = context.browser.find_element(By.ID, 'id_bio')
     update_button = context.browser.find_element(By.ID, 'update')
     bio_field.send_keys(bio)
@@ -118,6 +130,9 @@ def step_impl(context, bio):
 
 @when(u'I click the edit profile button')  # noqa: F811
 def step_impl(context):
+    WebDriverWait(context.browser, 10).until(
+        EC.presence_of_element_located((By.PARTIAL_LINK_TEXT, 'Edit Profile'))
+    )
     update_button = context.browser.find_element(
         By.PARTIAL_LINK_TEXT,
         'Edit Profile',
@@ -127,6 +142,9 @@ def step_impl(context):
 
 @when(u'I click the log out button')  # noqa: F811
 def step_impl(context):
+    WebDriverWait(context.browser, 10).until(
+        EC.presence_of_element_located((By.PARTIAL_LINK_TEXT, 'Log Out'))
+    )
     logout_button = context.browser.find_element(
         By.PARTIAL_LINK_TEXT,
         'Log Out',
@@ -145,19 +163,27 @@ def step_impl(context):
 
 @then("I see the profile page")  # noqa: F811
 def step_impl(context):
-    assert context.browser.title == 'DjangoGoat | Profile'
+    WebDriverWait(context.browser, 10).until(
+        EC.title_is('DjangoGoat | Profile')
+    )
 
 
 @then("I see the profile update page")  # noqa: F811
 def step_impl(context):
-    assert context.browser.title == 'DjangoGoat | Profile Update'
+    WebDriverWait(context.browser, 10).until(
+        EC.title_is('DjangoGoat | Profile Update')
+    )
 
 
 @then("I see the dashboard")  # noqa: F811
 def step_impl(context):
-    assert context.browser.title == 'DjangoGoat | Dash'
+    WebDriverWait(context.browser, 10).until(
+        EC.title_is('DjangoGoat | Dash')
+    )
 
 
 @then("I see the login page")  # noqa: F811
 def step_impl(context):
-    assert context.browser.title == 'DjangoGoat | Log In'
+    WebDriverWait(context.browser, 10).until(
+        EC.title_is('DjangoGoat | Log In')
+    )
