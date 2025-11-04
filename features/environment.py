@@ -58,25 +58,58 @@ def _resolve_zap_path():
 
 def start_zap():
     """
-    Spawns a new process running ZAP in daemon mode.
+    Spawns a new process running ZAP in daemon mode and waits for it to be ready.
     """
     path = _resolve_zap_path()
     if not path:
         print('OWASP ZAP executable not found. Skipping proxy setup.')
         return False
 
+    # Check if ZAP is already running and accessible
+    print('Checking if ZAP is already running...')
+    try:
+        test_zap = ZAPv2(apikey=None, proxies={'http': 'http://127.0.0.1:8080', 'https': 'http://127.0.0.1:8080'})
+        version = test_zap.core.version
+        print(f'✓ ZAP is already running (version: {version})')
+        return True
+    except Exception:
+        pass  # ZAP not running, continue to start it
+
     print(f'Starting OWASP ZAP from: {path}')
-    subprocess.Popen(
+    zap_process = subprocess.Popen(
         [path, '-daemon', '-config', 'api.disablekey=true', '-port', '8080'],
         stdout=open(os.devnull, 'w'),
         stderr=subprocess.STDOUT,
     )
 
-    # Wait for ZAP to start up and be ready
-    print('Waiting for ZAP to start...')
-    sleep(15)
-    print('ZAP should be ready')
-    return True
+    # Wait for ZAP to be ready by checking if the API is accessible
+    print('Waiting for ZAP to start (this may take 20-30 seconds)...')
+    zap = ZAPv2(apikey=None, proxies={'http': 'http://127.0.0.1:8080', 'https': 'http://127.0.0.1:8080'})
+    
+    max_wait_time = 60  # Maximum wait time in seconds
+    wait_interval = 2   # Check every 2 seconds
+    elapsed = 0
+    
+    while elapsed < max_wait_time:
+        try:
+            # Try to connect to ZAP API
+            version = zap.core.version
+            print(f'✓ ZAP daemon started successfully (version: {version})')
+            return True
+        except Exception:
+            # ZAP not ready yet
+            sleep(wait_interval)
+            elapsed += wait_interval
+            if elapsed % 10 == 0:
+                print(f'  Still waiting... ({elapsed}s elapsed)')
+    
+    # If we get here, ZAP didn't start in time
+    print('✗ ERROR: ZAP failed to start within timeout period')
+    try:
+        zap_process.terminate()
+    except:
+        pass
+    return False
 
 
 @fixture
@@ -230,8 +263,21 @@ def after_all(context):
         # Report the results
         print('Zap hosts: ' + ', '.join(zap.core.hosts))
         alerts = zap.core.alerts()
+        
+        # Count alerts by risk level
+        alert_by_risk = {'High': 0, 'Medium': 0, 'Low': 0, 'Informational': 0}
+        for alert in alerts:
+            risk = alert.get('risk', 'Informational')
+            if risk in alert_by_risk:
+                alert_by_risk[risk] += 1
+        
         if alerts:
             print('There are %s Zap alerts.' % len(alerts))
+            print('Alerts by Risk Level:')
+            print('  High: %d' % alert_by_risk['High'])
+            print('  Medium: %d' % alert_by_risk['Medium'])
+            print('  Low: %d' % alert_by_risk['Low'])
+            print('  Informational: %d' % alert_by_risk['Informational'])
             with open('report.html', 'w') as f:
                 f.write(zap.core.htmlreport())
             print('A report has been saved.')
