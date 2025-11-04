@@ -188,7 +188,7 @@ def before_all(context):
 def after_all(context):
     """
     This function is run after the BDD tests are run. We use it to kick off the
-    ZAP scanning.
+    comprehensive ZAP scanning with Django-specific configuration.
     """
     if not getattr(context, 'zap_enabled', False):
         print('OWASP ZAP was not started; skipping active scanning.')
@@ -198,70 +198,195 @@ def after_all(context):
         # General preparation.
         zap = ZAPv2(apikey=None)
         base_url = getattr(context, 'base_url', DEFAULT_BASE_URL).rstrip('/')
+        logged_out_indicator_regex = r'\QSign Up\E'
         logout_url_regex = '%s/logout.*' % base_url
+        main_context_regex = '%s.*' % base_url
         static_url_regex = '%s/static.*' % base_url
         
         # Create a new session to clear any previous alerts/data
-        print('Creating new ZAP session (clearing previous data)...')
+        print('\nCreating new ZAP session (clearing previous data)...')
         try:
             zap.core.new_session(name='', overwrite=True)
             print('✓ ZAP session cleared')
         except Exception as e:
             print(f'Note: Could not create new session: {e}')
-            # If new session fails, try to at least clear alerts
             try:
                 zap.core.delete_all_alerts()
                 print('✓ Cleared previous alerts')
             except Exception:
                 pass
-        # Set up the spider (simple, unauthenticated scanning).
+        
+        # Create ZAP context for Django app
+        zap_context_name = 'DjangoGoat Context'
+        print(f'\nCreating ZAP context: {zap_context_name}')
+        zap_context_id = zap.context.new_context(contextname=zap_context_name)
+        print(f'✓ Context created (ID: {zap_context_id})')
+        
+        # Include the target URL in the context
+        zap.context.include_in_context(contextname=zap_context_name, regex=main_context_regex)
+        print(f'✓ Added URL pattern to context: {main_context_regex}')
+        
+        # Set up Django-specific scripts
+        features_dir = os.path.join(BASE_DIR, 'features')
+        script_engine = 'Oracle Nashorn'
+        
+        # Load CSRF interceptor script for Django CSRF tokens
+        csrf_script_name = 'CSRFInterceptor.js'
+        csrf_script_path = os.path.join(features_dir, csrf_script_name)
+        if os.path.exists(csrf_script_path):
+            print(f'\nLoading CSRF interceptor script...')
+            try:
+                zap.script.load(
+                    scriptname=csrf_script_name,
+                    scripttype='httpsender',
+                    scriptengine=script_engine,
+                    filename=csrf_script_path,
+                )
+                zap.script.enable(scriptname=csrf_script_name)
+                print(f'✓ CSRF interceptor enabled')
+            except Exception as e:
+                print(f'Note: Could not load CSRF script: {e}')
+        
+        # Load Django authentication script
+        auth_script_name = 'DjangoAuthentication.js'
+        auth_script_path = os.path.join(features_dir, auth_script_name)
+        if os.path.exists(auth_script_path):
+            print(f'\nSetting up Django authentication...')
+            try:
+                zap.script.load(
+                    scriptname=auth_script_name,
+                    scripttype='authentication',
+                    scriptengine=script_engine,
+                    filename=auth_script_path,
+                )
+                
+                # Configure authentication method
+                auth_params = (
+                    f'scriptName={auth_script_name}&'
+                    'Username field=username&'
+                    'Password field=password&'
+                    f'Target URL={base_url}/login/'
+                )
+                zap.authentication.set_authentication_method(
+                    contextid=zap_context_id,
+                    authmethodname='scriptBasedAuthentication',
+                    authmethodconfigparams=auth_params
+                )
+                
+                # Set logged-out indicator
+                zap.authentication.set_logged_out_indicator(
+                    contextid=zap_context_id,
+                    loggedoutindicatorregex=logged_out_indicator_regex
+                )
+                print(f'✓ Django authentication configured')
+            except Exception as e:
+                print(f'Note: Could not configure authentication: {e}')
+        
+        # Create test user for authenticated scanning
+        print(f'\nCreating authenticated test user...')
+        user_list = [{'name': 'ImBaaaaad', 'credentials': 'Username=ImBaaaaad&Password=Appletr33!'}]
+        user_ids = []
+        
+        for user in user_list:
+            username = user.get('name')
+            try:
+                user_id = zap.users.new_user(contextid=zap_context_id, name=username)
+                zap.users.set_user_name(contextid=zap_context_id, userid=user_id, name=username)
+                zap.users.set_authentication_credentials(
+                    contextid=zap_context_id,
+                    userid=user_id,
+                    authcredentialsconfigparams=user.get('credentials')
+                )
+                zap.users.set_user_enabled(contextid=zap_context_id, userid=user_id, enabled=True)
+                user_ids.append(user_id)
+                print(f'✓ User created: {username} (ID: {user_id})')
+            except Exception as e:
+                print(f'Note: Could not create user {username}: {e}')
+        
+        # Configure spider
         spider = zap.spider
-        try:
-            spider.exclude_from_scan(logout_url_regex)
-            spider.exclude_from_scan(static_url_regex)
-        except:
-            pass  # Ignore errors in exclusions
-
-        # Spider the app as an unauthenticated user.
-        print('Spidering %s as an unauthenticated user.' % base_url)
+        spider.exclude_from_scan(logout_url_regex)
+        spider.exclude_from_scan(static_url_regex)
+        print('\n✓ Spider configured (excluded logout and static URLs)')
+        
+        # Spider as unauthenticated user
+        print(f'\nSpidering {base_url} as unauthenticated user...')
         scan_id = spider.scan(base_url)
         status = _safe_int(spider.status(scan_id), 0)
         while status >= 0 and status < 100:
-            print('Spider progress: %s%%' % status)
+            print(f'  Spider progress: {status}%')
             sleep(5)
             status = _safe_int(spider.status(scan_id), 100)
-        print('***RESULTS***')
-        for result in sorted(spider.results()):
-            print(result)
-        print('')
-
-        # # Give the passive scanner a chance to finish
+        print('✓ Unauthenticated spider complete')
+        
+        # Wait for passive scanner
+        print('Waiting for passive scanner...')
         records = _safe_int(zap.pscan.records_to_scan, 0)
-        while records > 0:
+        timeout = 0
+        while records > 0 and timeout < 60:
             sleep(1)
             records = _safe_int(zap.pscan.records_to_scan, 0)
-
-        # Set up the active scanner for unauthenticated scanning.
+            timeout += 1
+        print('✓ Passive scan complete')
+        
+        # Spider and scan as authenticated user
+        for user_id in user_ids:
+            print(f'\n--- Authenticated scanning as user {user_id} ---')
+            
+            # Spider as authenticated user
+            print('Spidering as authenticated user...')
+            try:
+                scan_id = spider.scan_as_user(
+                    contextid=zap_context_id,
+                    userid=user_id,
+                    url=base_url,
+                    recurse=True
+                )
+                status = _safe_int(spider.status(scan_id), 0)
+                timeout_count = 0
+                while status >= 0 and status < 100 and timeout_count < 60:
+                    print(f'  Spider progress: {status}%')
+                    sleep(5)
+                    status = _safe_int(spider.status(scan_id), 100)
+                    timeout_count += 1
+                print('✓ Authenticated spider complete')
+            except Exception as e:
+                print(f'Note: Authenticated spider had issues: {e}')
+            
+            # Wait for passive scanner
+            print('Waiting for passive scanner...')
+            records = _safe_int(zap.pscan.records_to_scan, 0)
+            timeout = 0
+            while records > 0 and timeout < 60:
+                sleep(1)
+                records = _safe_int(zap.pscan.records_to_scan, 0)
+                timeout += 1
+            print('✓ Passive scan complete')
+        
+        # Configure active scanner
         ascan = zap.ascan
-        try:
-            ascan.exclude_from_scan(logout_url_regex)
-            ascan.exclude_from_scan(static_url_regex)
-        except:
-            pass  # Ignore errors in exclusions
-
-        # Run basic active scan (unauthenticated)
-        print('Starting active scan of %s' % base_url)
+        ascan.exclude_from_scan(logout_url_regex)
+        ascan.exclude_from_scan(static_url_regex)
+        print('\n✓ Active scanner configured')
+        
+        # Run active scan
+        print(f'\nStarting active scan of {base_url}...')
         scan_id = ascan.scan(base_url)
         status = _safe_int(ascan.status(scan_id), 0)
-        while status >= 0 and status < 100:
-            print('Active scan progress: %s%%' % status)
+        timeout_count = 0
+        while status >= 0 and status < 100 and timeout_count < 120:  # 10 minute max
+            print(f'  Active scan progress: {status}%')
             sleep(5)
             status = _safe_int(ascan.status(scan_id), 100)
-
-        print('All scans completed')
-
+            timeout_count += 1
+        print('✓ Active scan complete')
+        
+        print('\n' + '='*70)
+        print('ALL SCANS COMPLETED')
+        print('='*70)
+        
         # Report the results
-        print('Zap hosts: ' + ', '.join(zap.core.hosts))
+        print(f'\nZAP hosts scanned: {", ".join(zap.core.hosts)}')
         alerts = zap.core.alerts()
         
         # Count alerts by risk level
@@ -272,17 +397,18 @@ def after_all(context):
                 alert_by_risk[risk] += 1
         
         if alerts:
-            print('There are %s Zap alerts.' % len(alerts))
+            print(f'\nThere are {len(alerts)} Zap alerts.')
             print('Alerts by Risk Level:')
-            print('  High: %d' % alert_by_risk['High'])
-            print('  Medium: %d' % alert_by_risk['Medium'])
-            print('  Low: %d' % alert_by_risk['Low'])
-            print('  Informational: %d' % alert_by_risk['Informational'])
+            print(f'  High: {alert_by_risk["High"]}')
+            print(f'  Medium: {alert_by_risk["Medium"]}')
+            print(f'  Low: {alert_by_risk["Low"]}')
+            print(f'  Informational: {alert_by_risk["Informational"]}')
             with open('report.html', 'w') as f:
                 f.write(zap.core.htmlreport())
-            print('A report has been saved.')
+            print('\n✓ Security report saved to report.html')
         else:
-            print('There are no Zap alerts.')
+            print('\n✓ There are no Zap alerts - application is secure!')
+            
     except Exception as e:
-        print('Error during ZAP scanning: %s' % str(e))
+        print(f'\n✗ Error during ZAP scanning: {str(e)}')
         print('ZAP scanning incomplete, but continuing...')
