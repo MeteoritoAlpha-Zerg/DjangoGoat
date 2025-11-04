@@ -167,6 +167,20 @@ def after_all(context):
         base_url = getattr(context, 'base_url', DEFAULT_BASE_URL).rstrip('/')
         logout_url_regex = '%s/logout.*' % base_url
         static_url_regex = '%s/static.*' % base_url
+        
+        # Create a new session to clear any previous alerts/data
+        print('Creating new ZAP session (clearing previous data)...')
+        try:
+            zap.core.new_session(name='', overwrite=True)
+            print('✓ ZAP session cleared')
+        except Exception as e:
+            print(f'Note: Could not create new session: {e}')
+            # If new session fails, try to at least clear alerts
+            try:
+                zap.core.delete_all_alerts()
+                print('✓ Cleared previous alerts')
+            except Exception:
+                pass
         # Set up the spider (simple, unauthenticated scanning).
         spider = zap.spider
         try:
