@@ -203,18 +203,14 @@ def after_all(context):
         main_context_regex = '%s.*' % base_url
         static_url_regex = '%s/static.*' % base_url
         
-        # Create a new session to clear any previous alerts/data
-        print('\nCreating new ZAP session (clearing previous data)...')
+        # Clear only alerts from previous runs, but keep the sites tree
+        # DO NOT call new_session() as it would clear all URLs discovered during behave tests
+        print('\nClearing previous ZAP alerts (keeping sites tree from behave tests)...')
         try:
-            zap.core.new_session(name='', overwrite=True)
-            print('✓ ZAP session cleared')
+            zap.core.delete_all_alerts()
+            print('✓ Cleared previous alerts (sites tree preserved)')
         except Exception as e:
-            print(f'Note: Could not create new session: {e}')
-            try:
-                zap.core.delete_all_alerts()
-                print('✓ Cleared previous alerts')
-            except Exception:
-                pass
+            print(f'Note: Could not clear alerts: {e}')
         
         # Create ZAP context for Django app
         zap_context_name = 'DjangoGoat Context'
