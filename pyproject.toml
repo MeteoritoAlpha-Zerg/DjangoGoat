@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{include = "djangogoat"}, {include = "authentication"}, {include = "features"}, {include = "notes"}, {include = "common"}]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = ">=3.8,<3.11"
 Django = "3.2.18"
 gunicorn = "20.1.0"
 pillow = "8.4.0"
