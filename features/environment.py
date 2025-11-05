@@ -142,7 +142,10 @@ def start_zap():
     # Start ZAP with verbose error output
     try:
         zap_process = subprocess.Popen(
-            [path, '-daemon', '-config', 'api.disablekey=true', '-port', '8080'],
+            [path, '-daemon', 
+             '-config', 'api.disablekey=true',
+             '-config', 'api.addons.autoupdate.onstart=false',
+             '-port', '8080'],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True
@@ -173,10 +176,10 @@ def start_zap():
         return False
 
     # Wait for ZAP to be ready by checking if the API is accessible
-    print('Waiting for ZAP to start (this may take 20-30 seconds)...')
+    print('Waiting for ZAP to start (first run may take 2-3 minutes for addon downloads)...')
     zap = ZAPv2(apikey=None, proxies={'http': 'http://127.0.0.1:8080', 'https': 'http://127.0.0.1:8080'})
     
-    max_wait_time = 60  # Maximum wait time in seconds
+    max_wait_time = 300  # 5 minutes for first-time addon downloads
     wait_interval = 2   # Check every 2 seconds
     elapsed = 0
     
