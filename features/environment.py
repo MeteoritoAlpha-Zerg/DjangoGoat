@@ -222,7 +222,7 @@ def start_firefox(context, zap_proxy=None):
         proxy.proxy_type = ProxyType.MANUAL
         proxy.http_proxy = zap_proxy
         proxy.ssl_proxy = zap_proxy
-        proxy.ftp_proxy = zap_proxy
+        # Note: ftpProxy removed - not supported in Firefox 90+
         # The noProxy list contains domains which Firefox appears to make requests
         # to automatically. If those requests pass through ZAP when scans are
         # running, they interfere with the scans, so set them as not being proxied.
