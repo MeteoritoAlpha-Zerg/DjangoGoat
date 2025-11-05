@@ -1,4 +1,5 @@
 import os
+import platform
 import subprocess
 from shutil import which
 
@@ -88,11 +89,54 @@ def start_zap():
         pass  # ZAP not running, continue to start it
 
     print(f'Starting OWASP ZAP from: {path}')
-    zap_process = subprocess.Popen(
-        [path, '-daemon', '-config', 'api.disablekey=true', '-port', '8080'],
-        stdout=open(os.devnull, 'w'),
-        stderr=subprocess.STDOUT,
-    )
+    
+    # Check if Java is available (required by ZAP)
+    java_path = which('java')
+    if not java_path:
+        print('✗ ERROR: Java is not installed. ZAP requires Java to run.')
+        print('Install Java with: apt install default-jre (Ubuntu/Debian) or brew install openjdk (macOS)')
+        return False
+    else:
+        print(f'✓ Java found: {java_path}')
+    
+    # Check if the path is executable
+    if not os.access(path, os.X_OK):
+        print(f'✗ ERROR: ZAP script is not executable: {path}')
+        print(f'Run: chmod +x {path}')
+        return False
+    
+    # Start ZAP with verbose error output
+    try:
+        zap_process = subprocess.Popen(
+            [path, '-daemon', '-config', 'api.disablekey=true', '-port', '8080'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        # Give it a moment to fail fast if there are immediate issues
+        sleep(2)
+        
+        # Check if process died immediately
+        poll_result = zap_process.poll()
+        if poll_result is not None:
+            # Process exited
+            stdout, stderr = zap_process.communicate(timeout=1)
+            print(f'✗ ERROR: ZAP process exited immediately with code {poll_result}')
+            if stdout:
+                print(f'STDOUT: {stdout[:500]}')
+            if stderr:
+                print(f'STDERR: {stderr[:500]}')
+            print('\nThis usually means ZAP is not properly installed or Java dependencies are missing.')
+            print('Try reinstalling ZAP with: snap install zaproxy --classic')
+            return False
+            
+    except FileNotFoundError as e:
+        print(f'✗ ERROR: Could not execute ZAP script: {e}')
+        return False
+    except Exception as e:
+        print(f'✗ ERROR: Unexpected error starting ZAP: {e}')
+        return False
 
     # Wait for ZAP to be ready by checking if the API is accessible
     print('Waiting for ZAP to start (this may take 20-30 seconds)...')
@@ -103,6 +147,19 @@ def start_zap():
     elapsed = 0
     
     while elapsed < max_wait_time:
+        # Check if process died while we were waiting
+        if zap_process.poll() is not None:
+            print(f'✗ ERROR: ZAP process died while starting (exit code: {zap_process.poll()})')
+            try:
+                stdout, stderr = zap_process.communicate(timeout=1)
+                if stdout:
+                    print(f'STDOUT: {stdout[:500]}')
+                if stderr:
+                    print(f'STDERR: {stderr[:500]}')
+            except:
+                pass
+            return False
+            
         try:
             # Try to connect to ZAP API
             version = zap.core.version
@@ -117,10 +174,29 @@ def start_zap():
     
     # If we get here, ZAP didn't start in time
     print('✗ ERROR: ZAP failed to start within timeout period')
-    try:
-        zap_process.terminate()
-    except:
-        pass
+    
+    # Try to get any error output before terminating
+    if zap_process.poll() is None:
+        print('ZAP process is still running but not responding. Terminating...')
+        try:
+            zap_process.terminate()
+            zap_process.wait(timeout=5)
+        except:
+            try:
+                zap_process.kill()
+            except:
+                pass
+    else:
+        print(f'ZAP process already exited with code: {zap_process.poll()}')
+        try:
+            stdout, stderr = zap_process.communicate(timeout=1)
+            if stdout:
+                print(f'STDOUT: {stdout[:500]}')
+            if stderr:
+                print(f'STDERR: {stderr[:500]}')
+        except:
+            pass
+    
     return False
 
 
@@ -133,6 +209,12 @@ def start_firefox(context, zap_proxy=None):
     
     options = Options()
     options.headless = True
+    
+    # Firefox-specific preferences for headless operation
+    options.set_preference('browser.privatebrowsing.autostart', False)
+    
+    # Set environment variables for headless operation
+    os.environ['MOZ_HEADLESS'] = '1'
     
     if zap_proxy:
         # Set up proxy for ZAP using Selenium 4 compatible method
@@ -153,11 +235,59 @@ def start_firefox(context, zap_proxy=None):
         'service': FirefoxService(executable_path=which('geckodriver') or 'geckodriver'),
     }
 
-    context.browser = webdriver.Firefox(**firefox_kwargs)
+    try:
+        context.browser = webdriver.Firefox(**firefox_kwargs)
+    except Exception as e:
+        print(f'\n✗ ERROR: Failed to start Firefox: {e}')
+        print(f'DISPLAY={os.environ.get("DISPLAY", "not set")}')
+        print(f'Geckodriver path: {which("geckodriver")}')
+        print(f'Firefox binary: {which("firefox")}')
+        raise
+    
     yield context.browser
 
     # Clean up once the tests finish.
     context.browser.quit()
+
+
+def start_xvfb():
+    """
+    Start Xvfb (X virtual framebuffer) for headless display on Linux systems.
+    Returns the process object or None if not needed/available.
+    """
+    # Only needed on Linux systems without a display
+    if platform.system().lower() != 'linux':
+        return None
+    
+    if os.environ.get('DISPLAY'):
+        print(f'DISPLAY already set to {os.environ["DISPLAY"]}, skipping Xvfb')
+        return None
+    
+    # Check if xvfb is available
+    if not which('Xvfb'):
+        print('Xvfb not found, continuing without virtual display (headless mode should still work)')
+        return None
+    
+    print('Starting Xvfb for headless display...')
+    try:
+        xvfb_process = subprocess.Popen(
+            ['Xvfb', ':99', '-screen', '0', '1920x1080x24', '-ac', '+extension', 'GLX', '+render', '-noreset'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        os.environ['DISPLAY'] = ':99'
+        sleep(2)  # Give Xvfb time to start
+        
+        # Check if it's still running
+        if xvfb_process.poll() is None:
+            print('✓ Xvfb started on DISPLAY=:99')
+            return xvfb_process
+        else:
+            print('⚠ Xvfb failed to start, continuing without it')
+            return None
+    except Exception as e:
+        print(f'⚠ Could not start Xvfb: {e}')
+        return None
 
 
 def recreate_database():
@@ -190,6 +320,9 @@ def before_all(context):
     """
     This function is run before the BDD tests are run.
     """
+    # Start Xvfb for headless display if needed
+    context.xvfb_process = start_xvfb()
+    
     recreate_database()
     context.base_url = DEFAULT_BASE_URL.rstrip('/')
     context.zap_enabled = start_zap()
@@ -546,3 +679,17 @@ def after_all(context):
     except Exception as e:
         print(f'\n✗ Error during ZAP scanning: {str(e)}')
         print('ZAP scanning incomplete, but continuing...')
+    
+    # Clean up Xvfb if it was started
+    finally:
+        if hasattr(context, 'xvfb_process') and context.xvfb_process:
+            print('\nStopping Xvfb...')
+            try:
+                context.xvfb_process.terminate()
+                context.xvfb_process.wait(timeout=5)
+                print('✓ Xvfb stopped')
+            except:
+                try:
+                    context.xvfb_process.kill()
+                except:
+                    pass
