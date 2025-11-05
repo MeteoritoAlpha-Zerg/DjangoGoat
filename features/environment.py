@@ -483,12 +483,15 @@ def after_all(context):
         print(f'\nZAP hosts scanned: {", ".join(zap.core.hosts)}')
         alerts = zap.core.alerts()
         
-        # Count alerts by risk level
+        # Count and organize alerts by risk level
         alert_by_risk = {'High': 0, 'Medium': 0, 'Low': 0, 'Informational': 0}
+        alerts_by_level = {'High': [], 'Medium': [], 'Low': [], 'Informational': []}
+        
         for alert in alerts:
             risk = alert.get('risk', 'Informational')
             if risk in alert_by_risk:
                 alert_by_risk[risk] += 1
+                alerts_by_level[risk].append(alert)
         
         if alerts:
             print(f'\nThere are {len(alerts)} Zap alerts.')
@@ -497,6 +500,31 @@ def after_all(context):
             print(f'  Medium: {alert_by_risk["Medium"]}')
             print(f'  Low: {alert_by_risk["Low"]}')
             print(f'  Informational: {alert_by_risk["Informational"]}')
+            
+            # Show detailed alerts by risk level
+            for risk_level in ['High', 'Medium', 'Low', 'Informational']:
+                level_alerts = alerts_by_level[risk_level]
+                if level_alerts:
+                    print(f'\n{risk_level} Severity Alerts:')
+                    # Show unique alert types (many URLs may have same vulnerability)
+                    seen_alerts = {}
+                    for alert in level_alerts:
+                        alert_name = alert.get('alert', 'Unknown')
+                        url = alert.get('url', 'Unknown')
+                        
+                        if alert_name not in seen_alerts:
+                            seen_alerts[alert_name] = []
+                        seen_alerts[alert_name].append(url)
+                    
+                    # Display each unique alert with affected URLs
+                    for alert_name, urls in seen_alerts.items():
+                        print(f'  • {alert_name}')
+                        # Show up to 3 example URLs
+                        for url in urls[:3]:
+                            print(f'    - {url}')
+                        if len(urls) > 3:
+                            print(f'    ... and {len(urls) - 3} more URL(s)')
+            
             with open('report.html', 'w') as f:
                 f.write(zap.core.htmlreport())
             print('\n✓ Security report saved to report.html')
