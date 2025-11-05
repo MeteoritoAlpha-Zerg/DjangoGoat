@@ -1,6 +1,7 @@
 import os
 import platform
 import subprocess
+from pathlib import Path
 from shutil import which
 
 from time import sleep
@@ -45,11 +46,12 @@ def _resolve_zap_path():
     if zap_binary:
         return zap_binary
 
-    # Check ~/.local/zap installation (common for local installations)
+    # Check ~/.local/bin and ~/.local/zap
     home = os.path.expanduser('~')
     local_paths = [
-        os.path.join(home, '.local', 'zap', 'zap.sh'),
         os.path.join(home, '.local', 'bin', 'zap.sh'),
+        '/usr/bin/zap.sh',
+        os.path.join(home, '.local', 'zap', 'zap.sh'),
     ]
     for path in local_paths:
         if os.path.exists(path):
@@ -464,13 +466,13 @@ def after_all(context):
         status = _safe_int(spider.status(scan_id), 0)
         timeout_count = 0
         
-        while status >= 0 and status < 100 and timeout_count < 720:  # 1 hour max (720 * 5sec)
+        while status >= 0 and status < 100 and timeout_count < 240:  # 20 minute max (240 * 5sec)
             print(f'  Spider progress: {status}%')
             sleep(5)
             status = _safe_int(spider.status(scan_id), 100)
             timeout_count += 1
         
-        if timeout_count >= 720:
+        if timeout_count >= 240:
             print('  ⚠ Spider timed out - stopping')
             try:
                 spider.stop(scan_id)
@@ -505,13 +507,13 @@ def after_all(context):
                 status = _safe_int(spider.status(scan_id), 0)
                 timeout_count = 0
                 
-                while status >= 0 and status < 100 and timeout_count < 720:  # 1 hour max (720 * 5sec)
+                while status >= 0 and status < 100 and timeout_count < 240:  # 20 minute max (240 * 5sec)
                     print(f'  Spider progress: {status}%')
                     sleep(5)
                     status = _safe_int(spider.status(scan_id), 100)
                     timeout_count += 1
                 
-                if timeout_count >= 720:
+                if timeout_count >= 240:
                     print('  ⚠ Authenticated spider timed out - stopping')
                     try:
                         spider.stop(scan_id)
@@ -553,14 +555,14 @@ def after_all(context):
         status = _safe_int(ascan.status(scan_id), 0)
         timeout_count = 0
         
-        while status >= 0 and status < 100 and timeout_count < 720:  # 1 hour max (720 * 5sec)
+        while status >= 0 and status < 100 and timeout_count < 240:  # 20 minute max (240 * 5sec)
             print(f'  Active scan progress: {status}%')
             sleep(5)
             status = _safe_int(ascan.status(scan_id), 100)
             timeout_count += 1
         
         # Force stop if timed out
-        if timeout_count >= 720:
+        if timeout_count >= 240:
             print('  ⚠ Active scan timed out - forcing stop')
             try:
                 ascan.stop(scan_id)
