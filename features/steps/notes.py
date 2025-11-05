@@ -6,7 +6,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 
 def _base_url(context):
-    return getattr(context, 'base_url', 'http://localhost:8000')
+    return getattr(context, 'base_url', 'http://localhost:3572')
 
 
 @when(u'I write a note to "{friend}" with "{content}"')  # noqa: F811

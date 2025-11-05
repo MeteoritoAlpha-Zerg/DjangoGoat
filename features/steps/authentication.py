@@ -6,7 +6,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 
 def _go_to(context, path):
-    base_url = getattr(context, 'base_url', 'http://localhost:8000')
+    base_url = getattr(context, 'base_url', 'http://localhost:3572')
     context.browser.get(f'{base_url}{path}')
 
 
