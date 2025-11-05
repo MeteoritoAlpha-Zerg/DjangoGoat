@@ -365,11 +365,65 @@ def after_all(context):
             timeout += 1
         print('✓ Passive scan complete')
         
-        # Skip authenticated scanning to reduce scan time
-        # The unauthenticated spider + active scan provides sufficient coverage
-        # for most vulnerability detection
-        if user_ids:
-            print(f'\n✓ Skipping authenticated scanning (using unauthenticated scan only for speed)')
+        # Spider and scan as authenticated user (with aggressive timeouts)
+        for user_id in user_ids:
+            print(f'\n--- Authenticated scanning as user {user_id} ---')
+            
+            # Spider as authenticated user
+            print('Spidering as authenticated user...')
+            try:
+                scan_id = spider.scan_as_user(
+                    contextid=zap_context_id,
+                    userid=user_id,
+                    url=base_url,
+                    recurse=True
+                )
+                status = _safe_int(spider.status(scan_id), 0)
+                timeout_count = 0
+                last_status = -1
+                stuck_count = 0
+                
+                while status >= 0 and status < 100 and timeout_count < 36:  # 3 minute max
+                    print(f'  Spider progress: {status}%')
+                    
+                    # Detect if stuck
+                    if status == last_status:
+                        stuck_count += 1
+                        if stuck_count >= 4:  # Stuck for 20 seconds
+                            print(f'  ⚠ Authenticated spider stuck at {status}% - stopping')
+                            try:
+                                spider.stop(scan_id)
+                            except:
+                                pass
+                            break
+                    else:
+                        stuck_count = 0
+                    
+                    last_status = status
+                    sleep(5)
+                    status = _safe_int(spider.status(scan_id), 100)
+                    timeout_count += 1
+                
+                if timeout_count >= 36:
+                    print('  ⚠ Authenticated spider timed out - stopping')
+                    try:
+                        spider.stop(scan_id)
+                    except:
+                        pass
+                
+                print('✓ Authenticated spider complete')
+            except Exception as e:
+                print(f'Note: Authenticated spider had issues: {e}')
+            
+            # Wait for passive scanner
+            print('Waiting for passive scanner...')
+            records = _safe_int(zap.pscan.records_to_scan, 0)
+            timeout = 0
+            while records > 0 and timeout < 60:
+                sleep(1)
+                records = _safe_int(zap.pscan.records_to_scan, 0)
+                timeout += 1
+            print('✓ Passive scan complete')
         
         # Configure active scanner with aggressive timeouts
         ascan = zap.ascan
@@ -378,8 +432,8 @@ def after_all(context):
         
         # Set very aggressive scan options to prevent hanging
         try:
-            ascan.set_option_max_scan_duration_in_mins('3')  # 3 minute hard limit
-            ascan.set_option_max_rule_duration_in_mins('1')  # 1 minute per rule max
+            ascan.set_option_max_scan_duration_in_mins('5')  # 3 minute hard limit
+            ascan.set_option_max_rule_duration_in_mins('2')  # 1 minute per rule max
             ascan.set_option_thread_per_host('3')  # More threads for speed
             ascan.set_option_delay_in_ms('0')  # No delay between requests
             print('\n✓ Active scanner configured with aggressive timeouts')
