@@ -92,6 +92,36 @@ def start_zap():
 
     print(f'Starting OWASP ZAP from: {path}')
     
+    # Verify ZAP path exists
+    print(f'Verifying ZAP installation:')
+    print(f'  Path exists: {os.path.exists(path)}')
+    print(f'  Is file: {os.path.isfile(path)}')
+    print(f'  Is symlink: {os.path.islink(path)}')
+    
+    if os.path.islink(path):
+        real_path = os.readlink(path)
+        print(f'  Symlink target: {real_path}')
+        print(f'  Target exists: {os.path.exists(real_path)}')
+        
+        # If it's a broken symlink, remove it and fail
+        if not os.path.exists(real_path):
+            print(f'✗ ERROR: Broken symlink - target does not exist: {real_path}')
+            print(f'Removing broken symlink: {path}')
+            try:
+                os.remove(path)
+            except:
+                pass
+            return False
+    
+    if not os.path.exists(path):
+        print(f'✗ ERROR: ZAP not found at {path}')
+        # Check if /opt/zap exists
+        if os.path.exists('/opt/zap'):
+            print(f'/opt/zap exists, contents: {os.listdir("/opt/zap")[:10]}')
+        else:
+            print('/opt/zap does not exist')
+        return False
+    
     # Check if Java is available (required by ZAP)
     java_path = which('java')
     if not java_path:
@@ -106,6 +136,8 @@ def start_zap():
         print(f'✗ ERROR: ZAP script is not executable: {path}')
         print(f'Run: chmod +x {path}')
         return False
+    
+    print(f'✓ ZAP verified and ready to start')
     
     # Start ZAP with verbose error output
     try:
@@ -179,15 +211,29 @@ def start_zap():
     
     # Try to get any error output before terminating
     if zap_process.poll() is None:
-        print('ZAP process is still running but not responding. Terminating...')
+        print('ZAP process is still running but not responding.')
+        print('Getting process output...')
         try:
+            # Terminate and get output
             zap_process.terminate()
-            zap_process.wait(timeout=5)
-        except:
+            stdout, stderr = zap_process.communicate(timeout=5)
+            if stdout:
+                print(f'ZAP STDOUT (last 1000 chars):\n{stdout[-1000:]}')
+            if stderr:
+                print(f'ZAP STDERR (last 1000 chars):\n{stderr[-1000:]}')
+        except subprocess.TimeoutExpired:
+            print('ZAP did not terminate, killing...')
             try:
                 zap_process.kill()
+                stdout, stderr = zap_process.communicate(timeout=2)
+                if stdout:
+                    print(f'ZAP STDOUT (last 500 chars):\n{stdout[-500:]}')
+                if stderr:
+                    print(f'ZAP STDERR (last 500 chars):\n{stderr[-500:]}')
             except:
                 pass
+        except Exception as e:
+            print(f'Could not get ZAP output: {e}')
     else:
         print(f'ZAP process already exited with code: {zap_process.poll()}')
         try:
