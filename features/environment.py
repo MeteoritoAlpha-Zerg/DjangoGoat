@@ -463,31 +463,14 @@ def after_all(context):
         scan_id = spider.scan(base_url)
         status = _safe_int(spider.status(scan_id), 0)
         timeout_count = 0
-        last_status = -1
-        stuck_count = 0
         
-        while status >= 0 and status < 100 and timeout_count < 60:  # 5 minute max
+        while status >= 0 and status < 100 and timeout_count < 720:  # 1 hour max (720 * 5sec)
             print(f'  Spider progress: {status}%')
-            
-            # Detect if stuck
-            if status == last_status:
-                stuck_count += 1
-                if stuck_count >= 6:  # Stuck for 30 seconds
-                    print(f'  ⚠ Spider stuck at {status}% - stopping')
-                    try:
-                        spider.stop(scan_id)
-                    except:
-                        pass
-                    break
-            else:
-                stuck_count = 0
-            
-            last_status = status
             sleep(5)
             status = _safe_int(spider.status(scan_id), 100)
             timeout_count += 1
         
-        if timeout_count >= 60:
+        if timeout_count >= 720:
             print('  ⚠ Spider timed out - stopping')
             try:
                 spider.stop(scan_id)
@@ -521,31 +504,14 @@ def after_all(context):
                 )
                 status = _safe_int(spider.status(scan_id), 0)
                 timeout_count = 0
-                last_status = -1
-                stuck_count = 0
                 
-                while status >= 0 and status < 100 and timeout_count < 36:  # 3 minute max
+                while status >= 0 and status < 100 and timeout_count < 720:  # 1 hour max (720 * 5sec)
                     print(f'  Spider progress: {status}%')
-                    
-                    # Detect if stuck
-                    if status == last_status:
-                        stuck_count += 1
-                        if stuck_count >= 4:  # Stuck for 20 seconds
-                            print(f'  ⚠ Authenticated spider stuck at {status}% - stopping')
-                            try:
-                                spider.stop(scan_id)
-                            except:
-                                pass
-                            break
-                    else:
-                        stuck_count = 0
-                    
-                    last_status = status
                     sleep(5)
                     status = _safe_int(spider.status(scan_id), 100)
                     timeout_count += 1
                 
-                if timeout_count >= 36:
+                if timeout_count >= 720:
                     print('  ⚠ Authenticated spider timed out - stopping')
                     try:
                         spider.stop(scan_id)
@@ -586,32 +552,15 @@ def after_all(context):
         scan_id = ascan.scan(base_url)
         status = _safe_int(ascan.status(scan_id), 0)
         timeout_count = 0
-        last_status = -1
-        stuck_count = 0
         
-        while status >= 0 and status < 100 and timeout_count < 72:  # 6 minute max (72 * 5sec)
+        while status >= 0 and status < 100 and timeout_count < 720:  # 1 hour max (720 * 5sec)
             print(f'  Active scan progress: {status}%')
-            
-            # Detect if scan is stuck
-            if status == last_status:
-                stuck_count += 1
-                if stuck_count >= 6:  # Stuck for 30 seconds
-                    print(f'  ⚠ Scan stuck at {status}% - stopping scan')
-                    try:
-                        ascan.stop(scan_id)
-                    except:
-                        pass
-                    break
-            else:
-                stuck_count = 0
-            
-            last_status = status
             sleep(5)
             status = _safe_int(ascan.status(scan_id), 100)
             timeout_count += 1
         
         # Force stop if timed out
-        if timeout_count >= 72:
+        if timeout_count >= 720:
             print('  ⚠ Active scan timed out - forcing stop')
             try:
                 ascan.stop(scan_id)
