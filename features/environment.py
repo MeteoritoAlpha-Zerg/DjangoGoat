@@ -44,6 +44,16 @@ def _resolve_zap_path():
     if zap_binary:
         return zap_binary
 
+    # Check ~/.local/zap installation (common for local installations)
+    home = os.path.expanduser('~')
+    local_paths = [
+        os.path.join(home, '.local', 'zap', 'zap.sh'),
+        os.path.join(home, '.local', 'bin', 'zap.sh'),
+    ]
+    for path in local_paths:
+        if os.path.exists(path):
+            return path
+
     # Check common macOS installation paths
     macos_paths = [
         '/Applications/ZAP.app/Contents/Java/zap.sh',
@@ -62,7 +72,9 @@ def start_zap():
     """
     path = _resolve_zap_path()
     if not path:
-        print('OWASP ZAP executable not found. Skipping proxy setup.')
+        print('OWASP ZAP executable not found.')
+        print('Install ZAP with: snap install zaproxy --classic')
+        print('Or download from: https://www.zaproxy.org/download/')
         return False
 
     # Check if ZAP is already running and accessible
