@@ -582,24 +582,92 @@ def after_all(context):
                 records = _safe_int(zap.pscan.records_to_scan, 0)
                 timeout += 1
             print('✓ Passive scan complete')
+            
+            # Active scan as authenticated user
+            print('Running active scan as authenticated user...')
+            try:
+                ascan = zap.ascan
+                ascan.exclude_from_scan(logout_url_regex)
+                ascan.exclude_from_scan(static_url_regex)
+                
+                # Enable all scanners with maximum strength for comprehensive testing
+                print('Configuring scan policy for maximum coverage...')
+                try:
+                    # Set attack strength to HIGH for all scanners (INSANE can be too slow)
+                    # Attack modes: DEFAULT, LOW, MEDIUM, HIGH, INSANE
+                    ascan.set_option_attack_strength('HIGH')
+                    
+                    # Set alert threshold to MEDIUM to reduce false positives
+                    # Alert thresholds: DEFAULT, LOW, MEDIUM, HIGH
+                    ascan.set_option_alert_threshold('MEDIUM')
+                    
+                    # Enable all scanner categories
+                    ascan.enable_all_scanners()
+                    
+                    print('✓ All scanners enabled with HIGH attack strength and MEDIUM threshold')
+                except Exception as e:
+                    print(f'Note: Some scan policy options may not be available: {e}')
+                
+                scan_id = ascan.scan_as_user(
+                    contextid=zap_context_id,
+                    userid=user_id,
+                    url=base_url,
+                    recurse=True
+                )
+                status = _safe_int(ascan.status(scan_id), 0)
+                timeout_count = 0
+                
+                while status >= 0 and status < 100 and timeout_count < 240:  # 20 minute max
+                    print(f'  Active scan progress: {status}%')
+                    sleep(5)
+                    status = _safe_int(ascan.status(scan_id), 100)
+                    timeout_count += 1
+                
+                if timeout_count >= 240:
+                    print('  ⚠ Authenticated active scan timed out - stopping')
+                    try:
+                        ascan.stop(scan_id)
+                    except:
+                        pass
+                
+                print('✓ Authenticated active scan complete')
+            except Exception as e:
+                print(f'Note: Authenticated active scan had issues: {e}')
         
-        # Configure active scanner with aggressive timeouts
+        # Configure active scanner for unauthenticated scan
+        print(f'\n--- Unauthenticated Active Scan ---')
         ascan = zap.ascan
         ascan.exclude_from_scan(logout_url_regex)
         ascan.exclude_from_scan(static_url_regex)
         
-        # Set very aggressive scan options to prevent hanging
+        # Set scan options
         try:
-            ascan.set_option_max_scan_duration_in_mins('5')  # 3 minute hard limit
-            ascan.set_option_max_rule_duration_in_mins('2')  # 1 minute per rule max
+            ascan.set_option_max_scan_duration_in_mins('20')  # 20 minutes per scan
+            ascan.set_option_max_rule_duration_in_mins('5')  # 5 minutes per rule
             ascan.set_option_thread_per_host('3')  # More threads for speed
             ascan.set_option_delay_in_ms('0')  # No delay between requests
-            print('\n✓ Active scanner configured with aggressive timeouts')
+            print('✓ Active scanner configured')
         except Exception as e:
             print(f'Note: Could not set all scan options: {e}')
         
-        # Run active scan
-        print(f'\nStarting active scan of {base_url}...')
+        # Enable all scanners with maximum strength for comprehensive testing
+        print('Configuring scan policy for maximum coverage...')
+        try:
+            # Set attack strength to HIGH for all scanners
+            ascan.set_option_attack_strength('HIGH')
+            
+            # Set alert threshold to MEDIUM to reduce false positives
+            ascan.set_option_alert_threshold('MEDIUM')
+            
+            # Enable all scanner categories
+            ascan.enable_all_scanners()
+            
+            print('✓ All scanners enabled with HIGH attack strength and MEDIUM threshold')
+        except Exception as e:
+            print(f'Note: Some scan policy options may not be available: {e}')
+        
+        # Run unauthenticated active scan
+        print(f'Starting unauthenticated active scan of {base_url}...')
         scan_id = ascan.scan(base_url)
         status = _safe_int(ascan.status(scan_id), 0)
         timeout_count = 0
