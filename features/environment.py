@@ -1,6 +1,7 @@
 import os
 import platform
 import subprocess
+import tempfile
 from pathlib import Path
 from shutil import which
 
@@ -23,6 +24,9 @@ from zapv2 import ZAPv2
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_BASE_URL = os.environ.get('DJANGO_GOAT_BASE_URL', 'http://localhost:3572')
+
+# Global variable to store ZAP home directory for cleanup
+_zap_home_dir = None
 
 
 def _safe_int(value, default=-1):
@@ -139,10 +143,16 @@ def start_zap():
     
     print(f'✓ ZAP verified and ready to start')
     
-    # Start ZAP with addon auto-update enabled
+    # Create a clean ZAP home directory to avoid addon conflicts
+    global _zap_home_dir
+    _zap_home_dir = tempfile.mkdtemp(prefix='zap_home_')
+    print(f'Using clean ZAP home directory: {_zap_home_dir}')
+    
+    # Start ZAP with addon auto-update enabled and custom home directory
     try:
         zap_process = subprocess.Popen(
             [path, '-daemon', 
+             '-dir', _zap_home_dir,  # Use clean directory to avoid addon conflicts
              '-config', 'api.disablekey=true',
              '-addonupdate',  # Enable automatic addon updates on startup
              '-port', '8080'],
@@ -748,7 +758,7 @@ def after_all(context):
         print(f'\n✗ Error during ZAP scanning: {str(e)}')
         print('ZAP scanning incomplete, but continuing...')
     
-    # Clean up Xvfb if it was started
+    # Clean up Xvfb and ZAP home directory
     finally:
         if hasattr(context, 'xvfb_process') and context.xvfb_process:
             print('\nStopping Xvfb...')
@@ -761,3 +771,14 @@ def after_all(context):
                     context.xvfb_process.kill()
                 except:
                     pass
+        
+        # Clean up ZAP home directory
+        global _zap_home_dir
+        if _zap_home_dir and os.path.exists(_zap_home_dir):
+            print(f'\nCleaning up ZAP home directory: {_zap_home_dir}')
+            try:
+                import shutil
+                shutil.rmtree(_zap_home_dir, ignore_errors=True)
+                print('✓ ZAP home directory cleaned up')
+            except Exception as e:
+                print(f'⚠ Could not clean up ZAP home directory: {e}')
