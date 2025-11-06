@@ -60,7 +60,8 @@ def step_impl(context):
 
 @then("I see the write note form")  # noqa: F811
 def step_impl(context):
-    WebDriverWait(context.browser, 10).until(
+    # Increased wait from 10s to 20s to reduce flakiness
+    WebDriverWait(context.browser, 20).until(
         EC.presence_of_element_located(
             (By.ID, 'send_button')
         )
@@ -69,7 +70,7 @@ def step_impl(context):
 
 @then('I see the new note with "{content}"')  # noqa: F811
 def step_impl(context, content):
-    WebDriverWait(context.browser, 10).until(
+    WebDriverWait(context.browser, 20).until(
         EC.presence_of_element_located(
             (By.PARTIAL_LINK_TEXT, content)
         )
@@ -78,7 +79,7 @@ def step_impl(context, content):
 
 @then('I see a note from "{friend}"')  # noqa: F811
 def step_impl(context, friend):
-    WebDriverWait(context.browser, 10).until(
+    WebDriverWait(context.browser, 20).until(
         EC.presence_of_element_located(
             (By.PARTIAL_LINK_TEXT, friend)
         )

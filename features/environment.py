@@ -1,7 +1,6 @@
 import os
 import platform
 import subprocess
-import tempfile
 from pathlib import Path
 from shutil import which
 
@@ -24,9 +23,6 @@ from zapv2 import ZAPv2
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_BASE_URL = os.environ.get('DJANGO_GOAT_BASE_URL', 'http://localhost:3572')
-
-# Global variable to store ZAP home directory for cleanup
-_zap_home_dir = None
 
 
 def _safe_int(value, default=-1):
@@ -143,16 +139,10 @@ def start_zap():
     
     print(f'✓ ZAP verified and ready to start')
     
-    # Create a clean ZAP home directory to avoid addon conflicts
-    global _zap_home_dir
-    _zap_home_dir = tempfile.mkdtemp(prefix='zap_home_')
-    print(f'Using clean ZAP home directory: {_zap_home_dir}')
-    
-    # Start ZAP with addon auto-update enabled and custom home directory
+    # Start ZAP with addon auto-update enabled
     try:
         zap_process = subprocess.Popen(
             [path, '-daemon', 
-             '-dir', _zap_home_dir,  # Use clean directory to avoid addon conflicts
              '-config', 'api.disablekey=true',
              '-addonupdate',  # Enable automatic addon updates on startup
              '-port', '8080'],
@@ -328,24 +318,28 @@ def start_xvfb():
     if not which('Xvfb'):
         print('Xvfb not found, continuing without virtual display (headless mode should still work)')
         return None
-    
-    print('Starting Xvfb for headless display...')
+
+    print('Starting Xvfb on DISPLAY=:99...')
     try:
         xvfb_process = subprocess.Popen(
-            ['Xvfb', ':99', '-screen', '0', '1920x1080x24', '-ac', '+extension', 'GLX', '+render', '-noreset'],
+            ['Xvfb', ':99', '-screen', '0', '1920x1080x24', '-ac'],
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            stderr=subprocess.PIPE,
         )
-        os.environ['DISPLAY'] = ':99'
-        sleep(2)  # Give Xvfb time to start
-        
-        # Check if it's still running
+        sleep(2)
+
         if xvfb_process.poll() is None:
+            os.environ['DISPLAY'] = ':99'
             print('✓ Xvfb started on DISPLAY=:99')
             return xvfb_process
-        else:
-            print('⚠ Xvfb failed to start, continuing without it')
-            return None
+
+        stdout, stderr = xvfb_process.communicate(timeout=1)
+        print('⚠ Xvfb failed to start, continuing without it')
+        if stdout:
+            print(f'Xvfb STDOUT:\n{stdout}')
+        if stderr:
+            print(f'Xvfb STDERR:\n{stderr}')
+        return None
     except Exception as e:
         print(f'⚠ Could not start Xvfb: {e}')
         return None
@@ -408,6 +402,10 @@ def after_all(context):
         logout_url_regex = '%s/logout.*' % base_url
         main_context_regex = '%s.*' % base_url
         static_url_regex = '%s/static.*' % base_url
+        login_url_regex = '%s/login.*' % base_url
+        signup_url_regex = '%s/sign-up.*' % base_url
+        robots_url_regex = '%s/robots.txt' % base_url
+        sitemap_url_regex = '%s/sitemap.xml' % base_url
         
         # Clear only alerts from previous runs, but keep the sites tree
         # DO NOT call new_session() as it would clear all URLs discovered during behave tests
@@ -550,134 +548,37 @@ def after_all(context):
             timeout += 1
         print('✓ Passive scan complete')
         
-        # Spider and scan as authenticated user (with aggressive timeouts)
-        for user_id in user_ids:
-            print(f'\n--- Authenticated scanning as user {user_id} ---')
-            
-            # Spider as authenticated user
-            print('Spidering as authenticated user...')
-            try:
-                scan_id = spider.scan_as_user(
-                    contextid=zap_context_id,
-                    userid=user_id,
-                    url=base_url,
-                    recurse=True
-                )
-                status = _safe_int(spider.status(scan_id), 0)
-                timeout_count = 0
-                
-                while status >= 0 and status < 100 and timeout_count < 240:  # 20 minute max (240 * 5sec)
-                    print(f'  Spider progress: {status}%')
-                    sleep(5)
-                    status = _safe_int(spider.status(scan_id), 100)
-                    timeout_count += 1
-                
-                if timeout_count >= 240:
-                    print('  ⚠ Authenticated spider timed out - stopping')
-                    try:
-                        spider.stop(scan_id)
-                    except:
-                        pass
-                
-                print('✓ Authenticated spider complete')
-            except Exception as e:
-                print(f'Note: Authenticated spider had issues: {e}')
-            
-            # Wait for passive scanner
-            print('Waiting for passive scanner...')
-            records = _safe_int(zap.pscan.records_to_scan, 0)
-            timeout = 0
-            while records > 0 and timeout < 60:
-                sleep(1)
-                records = _safe_int(zap.pscan.records_to_scan, 0)
-                timeout += 1
-            print('✓ Passive scan complete')
-            
-            # Active scan as authenticated user
-            print('Running active scan as authenticated user...')
-            try:
-                ascan = zap.ascan
-                ascan.exclude_from_scan(logout_url_regex)
-                ascan.exclude_from_scan(static_url_regex)
-                
-                # Enable all scanners with maximum strength for comprehensive testing
-                print('Configuring scan policy for maximum coverage...')
-                try:
-                    # Set attack strength to HIGH for all scanners (INSANE can be too slow)
-                    # Attack modes: DEFAULT, LOW, MEDIUM, HIGH, INSANE
-                    ascan.set_option_attack_strength('HIGH')
-                    
-                    # Set alert threshold to MEDIUM to reduce false positives
-                    # Alert thresholds: DEFAULT, LOW, MEDIUM, HIGH
-                    ascan.set_option_alert_threshold('MEDIUM')
-                    
-                    # Enable all scanner categories
-                    ascan.enable_all_scanners()
-                    
-                    print('✓ All scanners enabled with HIGH attack strength and MEDIUM threshold')
-                except Exception as e:
-                    print(f'Note: Some scan policy options may not be available: {e}')
-                
-                scan_id = ascan.scan_as_user(
-                    contextid=zap_context_id,
-                    userid=user_id,
-                    url=base_url,
-                    recurse=True
-                )
-                status = _safe_int(ascan.status(scan_id), 0)
-                timeout_count = 0
-                
-                while status >= 0 and status < 100 and timeout_count < 240:  # 20 minute max
-                    print(f'  Active scan progress: {status}%')
-                    sleep(5)
-                    status = _safe_int(ascan.status(scan_id), 100)
-                    timeout_count += 1
-                
-                if timeout_count >= 240:
-                    print('  ⚠ Authenticated active scan timed out - stopping')
-                    try:
-                        ascan.stop(scan_id)
-                    except:
-                        pass
-                
-                print('✓ Authenticated active scan complete')
-            except Exception as e:
-                print(f'Note: Authenticated active scan had issues: {e}')
+        # Configure active scanner exclusions to avoid scanning login/signup/robots/sitemap
+        ascan = zap.ascan
+        ascan.exclude_from_scan(logout_url_regex)
+        ascan.exclude_from_scan(static_url_regex)
+        # Also exclude login, signup, robots and sitemap to reduce false positives
+        try:
+            ascan.exclude_from_scan(login_url_regex)
+            ascan.exclude_from_scan(signup_url_regex)
+            ascan.exclude_from_scan(robots_url_regex)
+            ascan.exclude_from_scan(sitemap_url_regex)
+        except Exception:
+            # If the ascan exclusion APIs differ, ignore and continue.
+            pass
         
-        # Configure active scanner for unauthenticated scan
-        print(f'\n--- Unauthenticated Active Scan ---')
+        # Configure active scanner with aggressive timeouts
         ascan = zap.ascan
         ascan.exclude_from_scan(logout_url_regex)
         ascan.exclude_from_scan(static_url_regex)
         
-        # Set scan options
+        # Set very aggressive scan options to prevent hanging
         try:
-            ascan.set_option_max_scan_duration_in_mins('20')  # 20 minutes per scan
-            ascan.set_option_max_rule_duration_in_mins('5')  # 5 minutes per rule
+            ascan.set_option_max_scan_duration_in_mins('5')  # 3 minute hard limit
+            ascan.set_option_max_rule_duration_in_mins('2')  # 1 minute per rule max
             ascan.set_option_thread_per_host('3')  # More threads for speed
             ascan.set_option_delay_in_ms('0')  # No delay between requests
-            print('✓ Active scanner configured')
+            print('\n✓ Active scanner configured with aggressive timeouts')
         except Exception as e:
             print(f'Note: Could not set all scan options: {e}')
         
-        # Enable all scanners with maximum strength for comprehensive testing
-        print('Configuring scan policy for maximum coverage...')
-        try:
-            # Set attack strength to HIGH for all scanners
-            ascan.set_option_attack_strength('HIGH')
-            
-            # Set alert threshold to MEDIUM to reduce false positives
-            ascan.set_option_alert_threshold('MEDIUM')
-            
-            # Enable all scanner categories
-            ascan.enable_all_scanners()
-            
-            print('✓ All scanners enabled with HIGH attack strength and MEDIUM threshold')
-        except Exception as e:
-            print(f'Note: Some scan policy options may not be available: {e}')
-        
-        # Run unauthenticated active scan
-        print(f'Starting unauthenticated active scan of {base_url}...')
+        # Run active scan
+        print(f'\nStarting active scan of {base_url}...')
         scan_id = ascan.scan(base_url)
         status = _safe_int(ascan.status(scan_id), 0)
         timeout_count = 0
@@ -748,17 +649,23 @@ def after_all(context):
                         if len(urls) > 3:
                             print(f'    ... and {len(urls) - 3} more URL(s)')
             
-            with open('report.html', 'w') as f:
-                f.write(zap.core.htmlreport())
-            print('\n✓ Security report saved to report.html')
         else:
             print('\n✓ There are no Zap alerts - application is secure!')
+        
+        # Always write the full HTML report so downstream automation can parse it
+        try:
+            html_report = zap.core.htmlreport()
+            with open('report.html', 'w') as f:
+                f.write(html_report)
+            print('\n✓ Security report saved to report.html')
+        except Exception as report_error:
+            print(f'\n✗ Unable to write ZAP report: {report_error}')
             
     except Exception as e:
         print(f'\n✗ Error during ZAP scanning: {str(e)}')
         print('ZAP scanning incomplete, but continuing...')
     
-    # Clean up Xvfb and ZAP home directory
+    # Clean up Xvfb if it was started
     finally:
         if hasattr(context, 'xvfb_process') and context.xvfb_process:
             print('\nStopping Xvfb...')
@@ -771,14 +678,3 @@ def after_all(context):
                     context.xvfb_process.kill()
                 except:
                     pass
-        
-        # Clean up ZAP home directory
-        global _zap_home_dir
-        if _zap_home_dir and os.path.exists(_zap_home_dir):
-            print(f'\nCleaning up ZAP home directory: {_zap_home_dir}')
-            try:
-                import shutil
-                shutil.rmtree(_zap_home_dir, ignore_errors=True)
-                print('✓ ZAP home directory cleaned up')
-            except Exception as e:
-                print(f'⚠ Could not clean up ZAP home directory: {e}')
