@@ -24,9 +24,9 @@ def sign_up(request):
             new_user = form.save()
             username = form.cleaned_data.get('username')
             raw_password = form.cleaned_data.get('password1')
+            # Create UserProfile without storing cleartext password
             UserProfile.objects.create(
                 user=new_user,
-                cleartext_password=raw_password,
             )
             user = authenticate(username=username, password=raw_password)
             login(request, user)
@@ -43,20 +43,8 @@ def log_in(request):
     if request.method == 'POST':
         username = request.POST['username']
         password = request.POST['password']
-        query = (
-            """
-            SELECT * FROM auth_user
-               INNER JOIN authentication_userprofile
-               ON auth_user.id = authentication_userprofile.user_id
-            WHERE username = '%s'
-            AND authentication_userprofile.cleartext_password = '%s';
-            """
-            % (username, password)
-        )
-        try:
-            user = User.objects.raw(query)[0]
-        except IndexError:
-            user = None
+        # Use Django's built-in authenticate function to prevent SQL injection
+        user = authenticate(username=username, password=password)
         if user:
             login(request, user)
             return redirect('dash')
@@ -70,11 +58,7 @@ def log_in(request):
 def profile_update(request):
     user = request.user
     if request.method == 'POST':
-        form = UserProfileForm(
-            request.POST,
-            request.FILES,
-            instance=user.userprofile
-        )
+        form = UserProfileForm(request.POST, request.FILES, instance=user.userprofile)
         if form.is_valid():
             user_profile = form.save(commit=False)
             user_profile.user = user
@@ -84,12 +68,19 @@ def profile_update(request):
         form = UserProfileForm(instance=user.userprofile)
 
     return render(request, 'profile_update.html', {
-     'form': form,
-     'user': user,
+        'form': form,
+        'user': user,
     })
 
 
+@login_required
 def profile(request, pk):
-    target_user = get_object_or_404(User, pk=pk)
-
-    return render(request, 'profile.html', {'target_user': target_user})
+    try:
+        # Validate pk is a number first
+        user_pk = int(pk)
+        target_user = get_object_or_404(User, pk=user_pk)
+        return render(request, 'profile.html', {'target_user': target_user})
+    except (ValueError, TypeError):
+        # Return 404 for non-numeric pk values
+        from django.http import Http404
+        raise Http404("User not found")

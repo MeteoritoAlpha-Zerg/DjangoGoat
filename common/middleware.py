@@ -8,5 +8,20 @@ class CacheHeaderMiddleware(object):
         response['Cache-Control'] = (
             'no-cache="Set-Cookie, Set-Cookie2", no-store, must-revalidate'
         )
-        response['Pragma'] = 'no-cache'
+        # Add comprehensive Content Security Policy header with proper fallbacks
+        # All directives have proper fallback to default-src where appropriate
+        response['Content-Security-Policy'] = (
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self'; "  # Removed 'unsafe-inline'
+            "img-src 'self' data:; "
+            "font-src 'self'; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'; "
+            "object-src 'none'; "  # No plugins allowed
+            "media-src 'self'; "
+            "child-src 'self';"
+        )
         return response
