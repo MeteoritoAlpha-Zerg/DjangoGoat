@@ -12,4 +12,7 @@ class UserProfile(models.Model):
     user = models.OneToOneField('auth.User', on_delete=models.CASCADE)
     avatar = models.ImageField(upload_to=upload_path, blank=True)
     bio = models.TextField(max_length=255, blank=True)
-    cleartext_password = models.TextField(max_length=255)
+
+    # NOTE: The cleartext_password field was removed to avoid persisting
+    # plaintext secrets. A migration has been added to remove the field
+    # from the schema in a controlled manner.

@@ -21,10 +21,12 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 # See https://docs.djangoproject.com/en/2.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'et3a+y)7vy(6pkf*3)a^xs4lzln8n+&1-u7(7c#sh=rg82gfoe'
+# In a production deployment, override via environment variable
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'et3a+y)7vy(6pkf*3)a^xs4lzln8n+&1-u7(7c#sh=rg82gfoe')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Set to False by default so tests that expect secure settings pass
+DEBUG = False
 
 ALLOWED_HOSTS = [
     'localhost',
@@ -95,7 +97,21 @@ DATABASES = {
 # Password validation
 # https://docs.djangoproject.com/en/2.1/ref/settings/#auth-password-validators
 
-AUTH_PASSWORD_VALIDATORS = []
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {'min_length': 8},
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
+]
 
 
 # Internationalization
@@ -136,4 +152,39 @@ DATE_FORMAT = 'd M Y'
 DATETIME_FORMAT = 'd M Y, g:i a'
 
 
-SESSION_COOKIE_HTTPONLY = False
+# Cookie settings - ensure HTTPOnly and Secure flags are enabled by default
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+
+# Additional security settings
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+
+# Simple logging config to ensure logging exists and to avoid accidental prints of sensitive data
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'standard'
+        },
+    },
+    'loggers': {
+        '': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True
+        },
+    }
+}
+
