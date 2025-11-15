@@ -24,14 +24,12 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 SECRET_KEY = 'et3a+y)7vy(6pkf*3)a^xs4lzln8n+&1-u7(7c#sh=rg82gfoe'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
+DEBUG = False
 ALLOWED_HOSTS = [
     'localhost',
-    '127.0.0.1'
+    '127.0.0.1',
+    'testserver',
 ]
-
-
 # Application definition
 
 INSTALLED_APPS = [
