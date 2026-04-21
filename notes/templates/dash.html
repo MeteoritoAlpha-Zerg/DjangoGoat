@@ -46,18 +46,18 @@
             {% endif %}
         </p>
         <small class="f7 mt0 mb2 black-60">
-        <p class="f6 fw4 pv2 mv0 black-80 word-normal">"{{ note.content }}"</p>
+          On {{ note.created|date:'d M Y' }} at
           {{ note.created|date:'g:i a' }}
-        <p class="f6 fw4 pv2 mv0 black-80 word-normal">"{{ note.content }}"</p>
+          <b>
           {% if note.sender == user %}
             you
           {% else %}
-        <p class="f6 fw4 pv2 mv0 black-80 word-normal">"{{ note.content }}"</p>
+            {{ note.sender }}
           {% endif %}
           </b>
-        <p class="f6 fw4 pv2 mv0 black-80 word-normal">"{{ note.content }}"</p>
+          said:
         </small>
-        <p class="f6 fw4 pv2 mv0 black-80 word-normal">"{{ note.content | safe }}"</p>
+        <p class="f6 fw4 pv2 mv0 black-80 word-normal">"{{ note.content }}"</p>
         </a>
       </div>
     </article>
