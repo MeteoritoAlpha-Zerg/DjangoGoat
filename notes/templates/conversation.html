@@ -41,7 +41,9 @@
             <a class="link dim" href="{% url 'note' pk=note.pk %}">
               <small class="f7 mt0 mb2 black-60">
                 On {{ note.created|date:'d M Y' }} at
-              <p class="f6 fw4 pv2 mv0 black-80">"{{ note.content }}"</p>
+                {{ note.created|date:'g:i a' }}
+              </small>
+              <p class="f6 fw4 pv2 mv0 black-80">"{{ note.content|escape }}"</p>
             </a>
           </div>
         </article>
@@ -54,7 +56,7 @@
                   {{ note.created|date:'g:i a' }}
                   <b>{{ friend_name }}</b> said:
                 </small>
-                <p class="f6 fw4 pv2 mv0 black-80">"{{ note.content }}"</p>
+                <p class="f6 fw4 pv2 mv0 black-80">"{{ note.content|escape }}"</p>
               </a>
             </div>
           <div class="dtc w2 w3-ns v-mid">
