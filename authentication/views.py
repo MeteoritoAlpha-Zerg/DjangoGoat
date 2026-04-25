@@ -34,6 +34,10 @@ def sign_up(request):
             if user:
                 login(request, user)
                 return redirect('profile', pk=user.pk)
+            else:
+                # Authentication failed unexpectedly after user creation; render
+                # signup form with an error message so user is not left confused.
+                form.add_error(None, 'Account created but automatic login failed. Please log in manually.')
     else:
         form = UserCreationForm()
 
