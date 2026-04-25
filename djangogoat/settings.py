@@ -156,21 +156,21 @@ DATETIME_FORMAT = 'd M Y, g:i a'
 # Use HttpOnly to help mitigate XSS access to cookies.
 # 'Secure' flags are disabled to allow development/testing over HTTP (e.g., for ZAP).
 # Also configured for ZAP testing compatibility
-SESSION_COOKIE_HTTPONLY = True  # Disabled for ZAP testing
-CSRF_COOKIE_HTTPONLY = True     # Disabled for ZAP testing
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
-SESSION_COOKIE_SAMESITE = 'Lax'    # Changed to None for ZAP compatibility
-CSRF_COOKIE_SAMESITE = 'Lax'      # Changed to None for ZAP compatibility
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
 
 # Additional security headers and protections (defense in depth)
-# Disabled for ZAP testing to prevent interference with automated scanning
-SECURE_BROWSER_XSS_FILTER = False
-SECURE_CONTENT_TYPE_NOSNIFF = False
-SECURE_HSTS_SECONDS = 0  # Disabled HSTS for HTTP-only/ZAP testing
-SECURE_HSTS_INCLUDE_SUBDOMAINS = False
-SECURE_HSTS_PRELOAD = False
-X_FRAME_OPTIONS = 'SAMEORIGIN'  # Changed from DENY to allow ZAP testing
+# Set XSS and content-type protections to True for hardening; HSTS enabled when not DEBUG
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_HSTS_SECONDS = 0 if DEBUG else 31536000
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+SECURE_HSTS_PRELOAD = not DEBUG
+X_FRAME_OPTIONS = 'SAMEORIGIN'
 
 # CSRF settings optimized for ZAP testing
 CSRF_COOKIE_AGE = None  # Session-based CSRF token
