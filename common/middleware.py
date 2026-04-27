@@ -13,7 +13,7 @@ class CacheHeaderMiddleware(object):
         # attack surface. This is a conservative policy that allows only same-origin
         # resources and disallows plugins. Adjust as required by the application.
         try:
-            csp = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'"
+            csp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'"
             response.setdefault('Content-Security-Policy', csp)
         except Exception:
             # If the response object doesn't support dict-like methods, ignore

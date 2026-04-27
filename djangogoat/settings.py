@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
 import os
+import secrets
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -21,8 +22,23 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 # See https://docs.djangoproject.com/en/2.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-# In a production deployment, override via environment variable
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'et3a+y)7vy(6pkf*3)a^xs4lzln8n+&1-u7(7c#sh=rg82gfoe')
+# Prefer DJANGO_SECRET_KEY env var; if unset, persist generated key to file
+_env_secret = os.environ.get('DJANGO_SECRET_KEY')
+if _env_secret:
+    SECRET_KEY = _env_secret
+else:
+    _key_path = os.path.join(PROJECT_ROOT, '.dj_secret_key')
+    try:
+        with open(_key_path, 'r') as _f:
+            SECRET_KEY = _f.read().strip()
+    except Exception:
+        SECRET_KEY = secrets.token_urlsafe(50)
+        try:
+            with open(_key_path, 'w') as _f:
+                _f.write(SECRET_KEY)
+            os.chmod(_key_path, 0o600)
+        except Exception:
+            pass
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # Set to False by default so tests that expect secure settings pass
@@ -153,10 +169,13 @@ DATETIME_FORMAT = 'd M Y, g:i a'
 
 
 # Cookie settings - ensure HTTPOnly and Secure flags are enabled by default
+def _env_bool(name, default=False):
+    return os.environ.get(name, str(default)).lower() in ('1','true','yes')
+
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = _env_bool('SESSION_COOKIE_SECURE', False)
+CSRF_COOKIE_SECURE = _env_bool('CSRF_COOKIE_SECURE', False)
 
 # Additional security settings
 SECURE_BROWSER_XSS_FILTER = True
