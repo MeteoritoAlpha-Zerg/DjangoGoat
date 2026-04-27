@@ -22,10 +22,23 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 # See https://docs.djangoproject.com/en/2.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-# Require DJANGO_SECRET_KEY environment variable to avoid embedding secret in code
-# If not set, generate ephemeral secret to avoid import-time crash during local
-# management commands and tests.
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or secrets.token_urlsafe(50)
+# Prefer DJANGO_SECRET_KEY env var; if unset, persist generated key to file
+_env_secret = os.environ.get('DJANGO_SECRET_KEY')
+if _env_secret:
+    SECRET_KEY = _env_secret
+else:
+    _key_path = os.path.join(PROJECT_ROOT, '.dj_secret_key')
+    try:
+        with open(_key_path, 'r') as _f:
+            SECRET_KEY = _f.read().strip()
+    except Exception:
+        SECRET_KEY = secrets.token_urlsafe(50)
+        try:
+            with open(_key_path, 'w') as _f:
+                _f.write(SECRET_KEY)
+            os.chmod(_key_path, 0o600)
+        except Exception:
+            pass
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # Set to False by default so tests that expect secure settings pass
